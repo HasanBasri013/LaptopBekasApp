@@ -22,7 +22,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='LaptopBekasApp',
-    icon='app.ico',          # Tambahkan ini
+    icon='LOGOCOMPRIJAL.ico',          # Tambahkan ini
     debug=True,
     bootloader_ignore_signals=False,
     strip=False,
