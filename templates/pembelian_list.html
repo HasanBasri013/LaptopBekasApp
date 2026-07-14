@@ -36,7 +36,7 @@
                     <td>{{ r.merk }} {{ r.seri }}</td>
                     <td class="small text-muted">{{ r.processor }} / {{ r.ram }} / {{ r.storage }}</td>
                     <td>{{ r.supplier or '-' }}</td>
-                    <td>{{ rp(r.total_modal) }}</td>
+                    <td class="text-end">{{ rp(r.total_modal) }}</td>
                     <td>
                         {% if r.status == 'Ready' %}
                             <span class="badge badge-ready">Ready</span>

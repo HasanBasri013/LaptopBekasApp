@@ -8,17 +8,36 @@ function confirmDelete(form) {
 
 // Auto format angka ribuan pada input harga (tampilan saja, value tetap angka murni saat submit)
 document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.input-rupiah').forEach(function (el) {
-        el.addEventListener('input', function () {
-            let val = el.value.replace(/[^0-9]/g, '');
-            el.value = val;
+
+    document.querySelectorAll('.input-rupiah').forEach(function(el){
+
+        // Format nilai awal saat halaman dibuka (Edit)
+        if(el.value){
+            el.value = formatRupiah(el.value);
+        }
+
+        // Saat fokus, hilangkan titik
+        el.addEventListener('focus', function(){
+            this.value = this.value.replace(/\./g, '');
         });
+
+        // Saat keluar dari input, tampilkan format
+        el.addEventListener('blur', function(){
+            if(this.value){
+                this.value = formatRupiah(this.value);
+            }
+        });
+
+        // Sebelum submit, kirim angka murni
+        el.form.addEventListener('submit', function(){
+            el.value = el.value.replace(/\./g, '');
+        });
+
     });
 
-    // auto hide alert
-    document.querySelectorAll('.alert-auto-hide').forEach(function (el) {
-        setTimeout(function () {
-            el.classList.remove('show');
-        }, 4000);
-    });
+    function formatRupiah(value){
+        let angka = value.toString().replace(/\D/g,'');
+        return angka.replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+    }
+
 });

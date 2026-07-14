@@ -90,7 +90,8 @@ def can_access_page(page_key: str) -> bool:
 
 def to_float(value, default=0.0):
     try:
-        v = float(str(value).replace(",", "").strip() or 0)
+        value = str(value).replace(".", "").replace(",", ".").strip()
+        v = float(value or 0)
         return v if v >= 0 else default
     except (TypeError, ValueError):
         return default
