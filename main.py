@@ -30,5 +30,6 @@ if __name__ == "__main__":
         resizable=True,
         min_size=(1024, 700),
     )
+    webview.settings['ALLOW_DOWNLOADS'] = True
 
     webview.start()
