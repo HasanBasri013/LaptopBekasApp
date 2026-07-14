@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if row else 'Tambah' }} Pembelian{% endblock %}
+{% block page_title %}{{ 'Edit' if row else 'Tambah' }} Pembelian Laptop{% endblock %}
+
+{% block content %}
+<div class="card-panel">
+    <form method="POST">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Nomor Pembelian</label>
+                <input type="text" class="form-control" value="{{ nomor_preview }}" disabled>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Tanggal <span class="text-danger">*</span></label>
+                <input type="date" name="tanggal" class="form-control" required
+                       value="{{ row.tanggal if row else now_date }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Supplier / Penjual</label>
+                <input type="text" name="supplier" class="form-control" value="{{ row.supplier if row else '' }}">
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Merk <span class="text-danger">*</span></label>
+                <input type="text" name="merk" class="form-control" required value="{{ row.merk if row else '' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Seri</label>
+                <input type="text" name="seri" class="form-control" value="{{ row.seri if row else '' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Processor</label>
+                <input type="text" name="processor" class="form-control" value="{{ row.processor if row else '' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">RAM</label>
+                <input type="text" name="ram" class="form-control" value="{{ row.ram if row else '' }}">
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Storage</label>
+                <input type="text" name="storage" class="form-control" value="{{ row.storage if row else '' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">VGA</label>
+                <input type="text" name="vga" class="form-control" value="{{ row.vga if row else '' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Warna</label>
+                <input type="text" name="warna" class="form-control" value="{{ row.warna if row else '' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Kondisi</label>
+                <select name="kondisi" class="form-select">
+                    {% for k in ['Mulus', 'Baik', 'Normal', 'Ada Lecet', 'Rusak Ringan'] %}
+                    <option {% if row and row.kondisi == k %}selected{% endif %}>{{ k }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Kelengkapan</label>
+                <input type="text" name="kelengkapan" class="form-control" placeholder="Dus, buku, dll" value="{{ row.kelengkapan if row else '' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Charger</label>
+                <select name="charger" class="form-select">
+                    <option value="Ada" {% if row and row.charger == 'Ada' %}selected{% endif %}>Ada</option>
+                    <option value="Tidak Ada" {% if row and row.charger == 'Tidak Ada' %}selected{% endif %}>Tidak Ada</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Tas</label>
+                <select name="tas" class="form-select">
+                    <option value="Ada" {% if row and row.tas == 'Ada' %}selected{% endif %}>Ada</option>
+                    <option value="Tidak Ada" {% if row and row.tas == 'Tidak Ada' %}selected{% endif %}>Tidak Ada</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Garansi</label>
+                <input type="text" name="garansi" class="form-control" placeholder="Contoh: 3 bulan toko" value="{{ row.garansi if row else '' }}">
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">IMEI / Serial Number</label>
+                <input type="text" name="imei" class="form-control" value="{{ row.imei if row else '' }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">No HP Supplier</label>
+                <input type="text" name="no_hp" class="form-control" value="{{ row.no_hp if row else '' }}">
+            </div>
+
+            <div class="col-12"><hr></div>
+
+            <div class="col-md-3">
+                <label class="form-label">Harga Beli (Rp) <span class="text-danger">*</span></label>
+                <input type="number" min="0" step="1" name="harga_beli" class="form-control input-rupiah" required value="{{ row.harga_beli|int if row else 0 }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Biaya Servis (Rp)</label>
+                <input type="number" min="0" step="1" name="biaya_servis" class="form-control input-rupiah" value="{{ row.biaya_servis|int if row else 0 }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Biaya Upgrade (Rp)</label>
+                <input type="number" min="0" step="1" name="biaya_upgrade" class="form-control input-rupiah" value="{{ row.biaya_upgrade|int if row else 0 }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Biaya Lain (Rp)</label>
+                <input type="number" min="0" step="1" name="biaya_lain" class="form-control input-rupiah" value="{{ row.biaya_lain|int if row else 0 }}">
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">Catatan</label>
+                <textarea name="catatan" class="form-control" rows="2">{{ row.catatan if row else '' }}</textarea>
+            </div>
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Simpan</button>
+            <a href="{{ url_for('pembelian_list') }}" class="btn btn-outline-secondary">Batal</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Profil Saya{% endblock %}
+{% block page_title %}Profil Saya{% endblock %}
+
+{% block content %}
+<div class="card-panel" style="max-width:500px;">
+    <div class="mb-3">
+        <span class="badge {{ 'bg-danger' if row.role == 'root' else 'bg-primary' }}">{{ row.role|upper }}</span>
+    </div>
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-control" value="{{ row.username }}" disabled>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Nama Lengkap</label>
+            <input type="text" name="nama" class="form-control" value="{{ row.nama or '' }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Password Baru</label>
+            <input type="password" name="password" class="form-control" placeholder="Kosongkan jika tidak ingin mengubah password">
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Simpan Perubahan</button>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+<form class="row g-2 align-items-end no-print" method="GET">
+    <div class="col-md-3">
+        <label class="form-label">Filter Periode</label>
+        <select name="filter" class="form-select" onchange="this.form.submit()">
+            <option value="semua" {% if filt=='semua' %}selected{% endif %}>Semua</option>
+            <option value="harian" {% if filt=='harian' %}selected{% endif %}>Harian</option>
+            <option value="bulanan" {% if filt=='bulanan' %}selected{% endif %}>Bulanan</option>
+            <option value="tahunan" {% if filt=='tahunan' %}selected{% endif %}>Tahunan</option>
+            <option value="periode" {% if filt=='periode' %}selected{% endif %}>Periode Kustom</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Dari Tanggal</label>
+        <input type="date" name="start_date" class="form-control" value="{{ start_date }}">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Sampai Tanggal</label>
+        <input type="date" name="end_date" class="form-control" value="{{ end_date }}">
+    </div>
+    <div class="col-md-3">
+        <button class="btn btn-primary w-100"><i class="bi bi-funnel"></i> Terapkan</button>
+    </div>
+</form>

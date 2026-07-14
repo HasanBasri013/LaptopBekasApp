@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Pembelian Laptop{% endblock %}
+{% block page_title %}Pembelian Laptop{% endblock %}
+
+{% block content %}
+<div class="card-panel">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <form class="d-flex gap-2" method="GET">
+            <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Cari merk, seri, processor, IMEI...">
+            <button class="btn btn-outline-primary"><i class="bi bi-search"></i></button>
+        </form>
+        <a href="{{ url_for('pembelian_tambah') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Tambah Pembelian
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>No. Pembelian</th>
+                    <th>Tanggal</th>
+                    <th>Merk / Seri</th>
+                    <th>Spesifikasi</th>
+                    <th>Supplier</th>
+                    <th>Total Modal</th>
+                    <th>Status</th>
+                    <th class="no-print">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr>
+                    <td>{{ r.nomor_pembelian }}</td>
+                    <td>{{ r.tanggal }}</td>
+                    <td>{{ r.merk }} {{ r.seri }}</td>
+                    <td class="small text-muted">{{ r.processor }} / {{ r.ram }} / {{ r.storage }}</td>
+                    <td>{{ r.supplier or '-' }}</td>
+                    <td>{{ rp(r.total_modal) }}</td>
+                    <td>
+                        {% if r.status == 'Ready' %}
+                            <span class="badge badge-ready">Ready</span>
+                        {% else %}
+                            <span class="badge badge-terjual">Terjual</span>
+                        {% endif %}
+                    </td>
+                    <td class="no-print">
+                        <div class="d-flex gap-1">
+                            <a href="{{ url_for('pembelian_cetak', id=r.id) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Cetak Nota"><i class="bi bi-printer"></i></a>
+                            <a href="{{ url_for('pembelian_edit', id=r.id) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+                            <form method="POST" action="{{ url_for('pembelian_hapus', id=r.id) }}" onsubmit="return confirmDelete(this)">
+                                <button class="btn btn-sm btn-outline-danger" title="Hapus"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-center text-muted py-4">Belum ada data pembelian.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
