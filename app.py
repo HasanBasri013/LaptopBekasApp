@@ -194,11 +194,23 @@ def dashboard():
     total_penjualan = conn.execute(
         "SELECT COALESCE(SUM(harga_jual),0) t FROM penjualan"
     ).fetchone()["t"]
-    total_pengeluaran = conn.execute(
-        "SELECT COALESCE(SUM(nominal),0) t FROM pengeluaran"
+    total_kas_masuk = conn.execute(
+        """
+        SELECT COALESCE(SUM(nominal),0) t
+        FROM pengeluaran
+        WHERE tipe='masuk'
+        """
     ).fetchone()["t"]
 
-    laba_rugi = total_penjualan - total_modal - total_pengeluaran
+    total_kas_keluar = conn.execute(
+        """
+        SELECT COALESCE(SUM(nominal),0) t
+        FROM pengeluaran
+        WHERE tipe='keluar'
+        """
+    ).fetchone()["t"]
+
+    laba_rugi = total_penjualan + total_kas_masuk - total_modal - total_kas_keluar
 
     masuk = conn.execute(
         "SELECT COALESCE(SUM(nominal),0) t FROM cashflow WHERE tipe='masuk'"
@@ -234,11 +246,28 @@ def dashboard():
         ).fetchone()["t"]
         penjualan_per_bulan.append(pj)
 
-        pg = conn.execute(
-            "SELECT COALESCE(SUM(nominal),0) t FROM pengeluaran WHERE strftime('%Y-%m', tanggal) = ?",
+        pg_masuk = conn.execute(
+            """
+            SELECT COALESCE(SUM(nominal),0) t
+            FROM pengeluaran
+            WHERE tipe='masuk'
+            AND strftime('%Y-%m', tanggal)=?
+            """,
             (ym,),
         ).fetchone()["t"]
-        pengeluaran_per_bulan.append(pg)
+
+        pg_keluar = conn.execute(
+            """
+            SELECT COALESCE(SUM(nominal),0) t
+            FROM pengeluaran
+            WHERE tipe='keluar'
+            AND strftime('%Y-%m', tanggal)=?
+            """,
+            (ym,),
+        ).fetchone()["t"]
+
+        cashflow_masuk_per_bulan.append(pg_masuk)
+        cashflow_keluar_per_bulan.append(pg_keluar)
 
         cm = conn.execute(
             "SELECT COALESCE(SUM(nominal),0) t FROM cashflow WHERE tipe='masuk' AND strftime('%Y-%m', tanggal) = ?",
@@ -259,7 +288,8 @@ def dashboard():
         total_terjual=total_terjual,
         total_modal=total_modal,
         total_penjualan=total_penjualan,
-        total_pengeluaran=total_pengeluaran,
+        total_kas_masuk=total_kas_masuk,
+     total_kas_keluar=total_kas_keluar,
         laba_rugi=laba_rugi,
         saldo_kas=saldo_kas,
         bulan_labels=bulan_labels,
@@ -618,8 +648,19 @@ def pengeluaran_tambah():
         conn = get_db_connection()
         nomor = generate_nomor("EX", "pengeluaran", "nomor")
         cur = conn.execute(
-            "INSERT INTO pengeluaran (nomor, tanggal, kategori, keterangan, nominal) VALUES (?,?,?,?,?)",
-            (nomor, tanggal, f.get("kategori"), f.get("keterangan"), nominal),
+            """
+            INSERT INTO pengeluaran
+            (nomor, tanggal, tipe, kategori, keterangan, nominal)
+            VALUES (?,?,?,?,?,?)
+            """,
+            (
+                nomor,
+                tanggal,
+                tipe,
+                f.get("kategori"),
+                f.get("keterangan"),
+                nominal,
+            ),
         )
         pid = cur.lastrowid
         conn.execute(
@@ -663,10 +704,23 @@ def pengeluaran_edit(id):
             conn.close()
             return redirect(url_for("pengeluaran_edit", id=id))
 
-        conn.execute(
-            "UPDATE pengeluaran SET tanggal=?, kategori=?, keterangan=?, nominal=? WHERE id=?",
-            (tanggal, f.get("kategori"), f.get("keterangan"), nominal, id),
-        )
+        conn.execute("""
+            UPDATE pengeluaran
+            SET
+                tanggal=?,
+                tipe=?,
+                kategori=?,
+                keterangan=?,
+                nominal=?
+            WHERE id=?
+        """, (
+            tanggal,
+            tipe,
+            f.get("kategori"),
+            f.get("keterangan"),
+            nominal,
+            id
+        ))
         conn.execute(
             """UPDATE cashflow SET tanggal=?, keterangan=?, tipe=?, nominal=?
                WHERE ref_type='pengeluaran' AND ref_id=?""",

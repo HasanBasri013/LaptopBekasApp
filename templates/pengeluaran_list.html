@@ -22,6 +22,7 @@
                     <th>Tanggal</th>
                     <th>Kategori</th>
                     <th>Keterangan</th>
+                    <th>Tipe</th>
                     <th>Nominal</th>
                     <th class="no-print">Aksi</th>
                 </tr>
@@ -33,6 +34,13 @@
                     <td>{{ r.tanggal }}</td>
                     <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ r.kategori }}</span></td>
                     <td>{{ r.keterangan or '-' }}</td>
+                    <td>
+                        {% if r.tipe == 'masuk' %}
+                            <span class="badge bg-success">Kas Masuk</span>
+                        {% else %}
+                            <span class="badge bg-danger">Kas Keluar</span>
+                        {% endif %}
+                    </td>
                     <td>{{ rp(r.nominal) }}</td>
                     <td class="no-print">
                         <div class="d-flex gap-1">
