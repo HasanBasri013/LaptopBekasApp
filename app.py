@@ -246,28 +246,11 @@ def dashboard():
         ).fetchone()["t"]
         penjualan_per_bulan.append(pj)
 
-        pg_masuk = conn.execute(
-            """
-            SELECT COALESCE(SUM(nominal),0) t
-            FROM pengeluaran
-            WHERE tipe='masuk'
-            AND strftime('%Y-%m', tanggal)=?
-            """,
+        pg = conn.execute(
+            "SELECT COALESCE(SUM(nominal),0) t FROM pengeluaran WHERE strftime('%Y-%m', tanggal) = ?",
             (ym,),
         ).fetchone()["t"]
-
-        pg_keluar = conn.execute(
-            """
-            SELECT COALESCE(SUM(nominal),0) t
-            FROM pengeluaran
-            WHERE tipe='keluar'
-            AND strftime('%Y-%m', tanggal)=?
-            """,
-            (ym,),
-        ).fetchone()["t"]
-
-        cashflow_masuk_per_bulan.append(pg_masuk)
-        cashflow_keluar_per_bulan.append(pg_keluar)
+        pengeluaran_per_bulan.append(pg)
 
         cm = conn.execute(
             "SELECT COALESCE(SUM(nominal),0) t FROM cashflow WHERE tipe='masuk' AND strftime('%Y-%m', tanggal) = ?",
@@ -289,7 +272,7 @@ def dashboard():
         total_modal=total_modal,
         total_penjualan=total_penjualan,
         total_kas_masuk=total_kas_masuk,
-     total_kas_keluar=total_kas_keluar,
+       total_kas_keluar=total_kas_keluar,
         laba_rugi=laba_rugi,
         saldo_kas=saldo_kas,
         bulan_labels=bulan_labels,

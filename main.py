@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     # Buka aplikasi desktop
     webview.create_window(
-        title="Laptop Bekas App",
+        title="Aplikasi Penjualan & Pembeliaan Stok",
         url="http://127.0.0.1:5000",
         width=1300,
         height=800,
