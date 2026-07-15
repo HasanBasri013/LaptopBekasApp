@@ -95,6 +95,36 @@ def to_float(value, default=0.0):
         return v if v >= 0 else default
     except (TypeError, ValueError):
         return default
+    
+def hitung_saldo_awal(start_date):
+    if not start_date:
+        return 0
+
+    conn = get_db_connection()
+
+    masuk = conn.execute(
+        """
+        SELECT COALESCE(SUM(nominal),0) t
+        FROM cashflow
+        WHERE tipe='masuk'
+        AND tanggal < ?
+        """,
+        (start_date,),
+    ).fetchone()["t"]
+
+    keluar = conn.execute(
+        """
+        SELECT COALESCE(SUM(nominal),0) t
+        FROM cashflow
+        WHERE tipe='keluar'
+        AND tanggal < ?
+        """,
+        (start_date,),
+    ).fetchone()["t"]
+
+    conn.close()
+
+    return masuk - keluar
 
 
 def get_period_range():
@@ -188,7 +218,7 @@ def dashboard():
     total_terjual = conn.execute(
         "SELECT COUNT(*) c FROM laptop WHERE status = 'Terjual'"
     ).fetchone()["c"]
-    total_modal = conn.execute(
+    modal_lapotop = conn.execute(
         "SELECT COALESCE(SUM(total_modal),0) t FROM laptop"
     ).fetchone()["t"]
     total_penjualan = conn.execute(
@@ -199,8 +229,20 @@ def dashboard():
         SELECT COALESCE(SUM(nominal),0) t
         FROM cashflow
         WHERE tipe='masuk'
+        AND IFNULL(ref_type,'') <> 'saldo_awal_kas'
         """
     ).fetchone()["t"]
+
+    saldo_awal_Periode = conn.execute("""
+    SELECT COALESCE(SUM(nominal),0) AS total
+    FROM cashflow
+    WHERE ref_type='saldo_awal_kas'
+    """).fetchone()["total"]
+
+    total_bersih = conn.execute("""
+    SELECT COALESCE(SUM(laba),0)
+    FROM penjualan
+    """).fetchone()[0]
 
     total_kas_keluar = conn.execute(
         """
@@ -210,16 +252,16 @@ def dashboard():
         """
     ).fetchone()["t"]
 
-    laba_rugi = total_penjualan + total_kas_masuk - total_modal - total_kas_keluar
+    laba_rugi = total_penjualan + total_kas_masuk - modal_lapotop - total_kas_keluar
 
     masuk = conn.execute(
-        "SELECT COALESCE(SUM(nominal),0) t FROM cashflow WHERE tipe='masuk'"
+        "SELECT COALESCE(SUM(nominal),0) t FROM pengeluaran WHERE tipe='masuk'"
     ).fetchone()["t"]
     keluar = conn.execute(
         "SELECT COALESCE(SUM(nominal),0) t FROM cashflow WHERE tipe='keluar'"
     ).fetchone()["t"]
-    saldo_kas = masuk - keluar
-
+    saldo_kas = saldo_awal_Periode + total_kas_masuk - total_kas_keluar
+    total_modal = saldo_awal_Periode + total_bersih + masuk
     # Data grafik: 6 bulan terakhir
     bulan_labels = []
     penjualan_per_bulan = []
@@ -272,7 +314,7 @@ def dashboard():
         total_modal=total_modal,
         total_penjualan=total_penjualan,
         total_kas_masuk=total_kas_masuk,
-       total_kas_keluar=total_kas_keluar,
+        total_kas_keluar=total_kas_keluar,
         laba_rugi=laba_rugi,
         saldo_kas=saldo_kas,
         bulan_labels=bulan_labels,
@@ -316,7 +358,7 @@ def pembelian_tambah():
         biaya_servis = to_float(f.get("biaya_servis"))
         biaya_upgrade = to_float(f.get("biaya_upgrade"))
         biaya_lain = to_float(f.get("biaya_lain"))
-        total_modal = harga_beli + biaya_servis + biaya_upgrade + biaya_lain
+        modal_laptop = harga_beli + biaya_servis + biaya_upgrade + biaya_lain
         tanggal = f.get("tanggal") or datetime.now().strftime("%Y-%m-%d")
 
         conn = get_db_connection()
@@ -331,14 +373,14 @@ def pembelian_tambah():
              f.get("storage"), f.get("vga"), f.get("warna"), f.get("kondisi"),
              f.get("kelengkapan"), f.get("charger"), f.get("tas"), f.get("garansi"),
              f.get("imei"), harga_beli, biaya_servis, biaya_upgrade, biaya_lain,
-             total_modal, f.get("supplier"), f.get("no_hp"), f.get("catatan")),
+             modal_laptop, f.get("supplier"), f.get("no_hp"), f.get("catatan")),
         )
         laptop_id = cur.lastrowid
         conn.execute(
             """INSERT INTO cashflow (tanggal, keterangan, tipe, nominal, ref_type, ref_id)
                VALUES (?,?,?,?,?,?)""",
             (tanggal, f"Pembelian Laptop {f.get('merk')} {f.get('seri')} ({nomor})",
-             "keluar", total_modal, "pembelian", laptop_id),
+             "keluar", modal_laptop, "pembelian", laptop_id),
         )
         conn.commit()
         conn.close()
@@ -365,7 +407,7 @@ def pembelian_edit(id):
         biaya_servis = to_float(f.get("biaya_servis"))
         biaya_upgrade = to_float(f.get("biaya_upgrade"))
         biaya_lain = to_float(f.get("biaya_lain"))
-        total_modal = harga_beli + biaya_servis + biaya_upgrade + biaya_lain
+        modal_laptop  = harga_beli + biaya_servis + biaya_upgrade + biaya_lain
         tanggal = f.get("tanggal") or row["tanggal"]
 
         conn.execute(
@@ -377,13 +419,13 @@ def pembelian_edit(id):
              f.get("storage"), f.get("vga"), f.get("warna"), f.get("kondisi"),
              f.get("kelengkapan"), f.get("charger"), f.get("tas"), f.get("garansi"),
              f.get("imei"), harga_beli, biaya_servis, biaya_upgrade, biaya_lain,
-             total_modal, f.get("supplier"), f.get("no_hp"), f.get("catatan"), id),
+             modal_laptop, f.get("supplier"), f.get("no_hp"), f.get("catatan"), id),
         )
         conn.execute(
             """UPDATE cashflow SET tanggal=?, keterangan=?, nominal=?
                WHERE ref_type='pembelian' AND ref_id=?""",
             (tanggal, f"Pembelian Laptop {f.get('merk')} {f.get('seri')} ({row['nomor_pembelian']})",
-             total_modal, id),
+             modal_laptop, id),
         )
         conn.commit()
         conn.close()
@@ -752,7 +794,7 @@ def cashflow_view():
     query += " ORDER BY tanggal ASC, id ASC"
     rows = conn.execute(query, params).fetchall()
 
-    saldo_awal = 0
+    saldo_awal = hitung_saldo_awal(start_date)
     if start_date:
         masuk_awal = conn.execute(
             "SELECT COALESCE(SUM(nominal),0) t FROM cashflow WHERE tipe='masuk' AND tanggal < ?",
@@ -863,7 +905,71 @@ def cashflow_hapus(id):
     flash("Transaksi kas berhasil dihapus.", "success")
     return redirect(url_for("cashflow_view"))
 
+@app.route("/cashflow/saldo-awal", methods=["GET", "POST"])
+@page_required("cashflow")
+def saldo_awal_kas():
 
+    conn = get_db_connection()
+
+    if request.method == "POST":
+        f = request.form
+
+        nominal = to_float(f.get("nominal"))
+        tanggal = f.get("tanggal") or datetime.now().strftime("%Y-%m-%d")
+        keterangan = (f.get("keterangan") or "Saldo Awal Kas").strip()
+
+        conn.execute(
+            "DELETE FROM cashflow WHERE ref_type='saldo_awal_kas'"
+        )
+
+        conn.execute(
+            """
+            INSERT INTO cashflow
+            (tanggal,keterangan,tipe,nominal,ref_type,ref_id)
+            VALUES
+            (?, ?, 'masuk', ?, 'saldo_awal_kas', NULL)
+            """,
+            (tanggal, keterangan, nominal)
+        )
+
+        conn.commit()
+        conn.close()
+
+        flash("Saldo awal berhasil disimpan.", "success")
+        return redirect(url_for("saldo_awal_kas"))
+
+    row = conn.execute(
+        """
+        SELECT *
+        FROM cashflow
+        WHERE ref_type='saldo_awal_kas'
+        LIMIT 1
+        """
+    ).fetchone()
+
+    conn.close()
+
+    return render_template(
+        "saldo_awal.html",
+        row=row
+    )
+
+@app.route("/cashflow/saldo-awal/hapus", methods=["POST"])
+@page_required("cashflow")
+def saldo_awal_kas_hapus():
+
+    conn = get_db_connection()
+
+    conn.execute(
+        "DELETE FROM cashflow WHERE ref_type='saldo_awal_kas'"
+    )
+
+    conn.commit()
+    conn.close()
+
+    flash("Saldo awal berhasil dihapus.", "success")
+
+    return redirect(url_for("saldo_awal_kas"))
 # ---------------------------------------------------------------------------
 # LAPORAN
 # ---------------------------------------------------------------------------

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Saldo Awal Kas{% endblock %}
+{% block page_title %}Saldo Awal Kas{% endblock %}
+
+{% block content %}
+<div class="card-panel" style="max-width:560px;">
+    <div class="alert alert-info small mb-4">
+        <i class="bi bi-info-circle"></i>
+        Gunakan ini untuk mencatat <b>kas yang sudah dimiliki toko sebelum mulai memakai
+        aplikasi ini</b> (modal awal). Nilai ini otomatis ditambahkan ke <b>Saldo Kas</b> pada
+        Dashboard dan Cash Flow, tetapi <b>tidak</b> memengaruhi perhitungan Laba/Rugi.
+        Hanya boleh ada satu baris Saldo Awal Kas &mdash; menyimpan ulang akan
+        menggantikan nilai sebelumnya.
+    </div>
+
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label">Tanggal Saldo Awal <span class="text-danger">*</span></label>
+            <input type="date" name="tanggal" class="form-control" required
+                   value="{{ row.tanggal if row else now_date }}">
+            <div class="form-text">Gunakan tanggal sebelum transaksi pertama Anda tercatat di aplikasi ini.</div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Nominal Saldo Awal (Rp) <span class="text-danger">*</span></label>
+        <input type="text"
+                name="nominal"
+                class="form-control input-rupiah"
+                required
+                value="{{ row.nominal|int if row else 0 }}">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Keterangan</label>
+            <input type="text" name="keterangan" class="form-control"
+                   value="{{ row.keterangan if row else 'Saldo Awal Kas' }}">
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Simpan</button>
+            {% if row %}
+            <form method="POST" action="{{ url_for('saldo_awal_kas_hapus') }}" onsubmit="return confirmDelete(this)">
+                <button class="btn btn-outline-danger"><i class="bi bi-trash"></i> Hapus (reset ke Rp 0)</button>
+            </form>
+            {% endif %}
+            <a href="{{ url_for('cashflow_view') }}" class="btn btn-outline-secondary">Kembali ke Cash Flow</a>
+        </div>
+    </form>
+
+    {% if row %}
+    <hr>
+    <p class="text-muted small mb-0">
+        Saldo awal saat ini: <b>{{ rp(row.nominal) }}</b> per tanggal <b>{{ row.tanggal }}</b>.
+    </p>
+    {% endif %}
+</div>
+{% endblock %}
