@@ -22,14 +22,20 @@ if __name__ == "__main__":
     time.sleep(1)
 
     # Buka aplikasi desktop
-    webview.create_window(
+    window=webview.create_window(
         title="Aplikasi Penjualan & Pembeliaan Stok",
         url="http://127.0.0.1:5000",
         width=1300,
         height=800,
         resizable=True,
         min_size=(1024, 700),
+        # fullscreen=True
     )
-    webview.settings['ALLOW_DOWNLOADS'] = True
 
+    def maximize():
+        window.maximize()
+
+    window.events.loaded += maximize
+
+    webview.settings['ALLOW_DOWNLOADS'] = True
     webview.start()

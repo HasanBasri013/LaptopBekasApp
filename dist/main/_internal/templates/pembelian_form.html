@@ -92,21 +92,26 @@
 
             <div class="col-12"><hr></div>
 
-            <div class="col-md-3">
-                <label class="form-label">Harga Beli (Rp) <span class="text-danger">*</span></label>
-                <input type="number" min="0" step="1" name="harga_beli" class="form-control input-rupiah" required value="{{ row.harga_beli|int if row else 0 }}">
+<div class="col-md-3">
+    <label class="form-label">
+        Harga Beli (Rp) <span class="text-danger">*</span>
+    </label>
+            <input type="text"
+                name="harga_beli"
+                class="form-control input-rupiah"
+                value="{{ row.harga_beli|int if row else '' }}">
             </div>
-            <div class="col-md-3">
+     <div class="col-md-3">
                 <label class="form-label">Biaya Servis (Rp)</label>
-                <input type="number" min="0" step="1" name="biaya_servis" class="form-control input-rupiah" value="{{ row.biaya_servis|int if row else 0 }}">
+                <input type="text" name="biaya_servis" class="form-control input-rupiah" value="{{ row.biaya_servis|int if row else '' }}">
             </div>
             <div class="col-md-3">
                 <label class="form-label">Biaya Upgrade (Rp)</label>
-                <input type="number" min="0" step="1" name="biaya_upgrade" class="form-control input-rupiah" value="{{ row.biaya_upgrade|int if row else 0 }}">
+                <input type="text" name="biaya_upgrade" class="form-control input-rupiah" value="{{ row.biaya_upgrade|int if row else ''  }}">
             </div>
             <div class="col-md-3">
                 <label class="form-label">Biaya Lain (Rp)</label>
-                <input type="number" min="0" step="1" name="biaya_lain" class="form-control input-rupiah" value="{{ row.biaya_lain|int if row else 0 }}">
+                <input type="text" name="biaya_lain" class="form-control input-rupiah" value="{{ row.biaya_lain|int if row else ''  }}">
             </div>
 
             <div class="col-12">

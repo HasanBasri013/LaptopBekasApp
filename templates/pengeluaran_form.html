@@ -37,7 +37,7 @@
             </div>
             <div class="col-md-4">
                 <label class="form-label">Nominal (Rp) <span class="text-danger">*</span></label>
-                <input type="number" min="0" step="1" name="nominal" class="form-control input-rupiah" required
+                <input type="text" name="nominal" class="form-control input-rupiah" required
                        value="{{ row.nominal|int if row else 0 }}">
             </div>
         </div>

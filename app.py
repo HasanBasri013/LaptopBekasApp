@@ -197,7 +197,7 @@ def dashboard():
     total_kas_masuk = conn.execute(
         """
         SELECT COALESCE(SUM(nominal),0) t
-        FROM pengeluaran
+        FROM cashflow
         WHERE tipe='masuk'
         """
     ).fetchone()["t"]
@@ -205,7 +205,7 @@ def dashboard():
     total_kas_keluar = conn.execute(
         """
         SELECT COALESCE(SUM(nominal),0) t
-        FROM pengeluaran
+        FROM cashflow
         WHERE tipe='keluar'
         """
     ).fetchone()["t"]

@@ -44,7 +44,7 @@
             {% endif %}
             {% if can_access_page('pengeluaran') %}
             <a class="nav-link {% if request.endpoint and request.endpoint.startswith('pengeluaran') %}active{% endif %}" href="{{ url_for('pengeluaran_list') }}">
-                <i class="bi bi-wallet2"></i> Pengeluaran
+                <i class="bi bi-wallet2"></i> Kas Keluar/Masuk
             </a>
             {% endif %}
             {% if can_access_page('cashflow') %}

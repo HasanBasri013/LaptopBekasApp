@@ -57,7 +57,7 @@
 
             <div class="col-md-6">
                 <label class="form-label">Harga Jual (Rp) <span class="text-danger">*</span></label>
-                <input type="number" min="0" step="1" name="harga_jual" class="form-control input-rupiah" required
+                <input type="text" name="harga_jual" class="form-control input-rupiah" required
                        value="{{ row.harga_jual|int if row else 0 }}">
             </div>
 

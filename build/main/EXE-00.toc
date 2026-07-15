@@ -68,7 +68,7 @@
  [],
  False,
  False,
- 1784006369,
+ 1784086305,
  [('runw.exe',
    'd:\\web\\web2\\LaptopBekasApp\\.venv\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\runw.exe',
    'EXECUTABLE')],

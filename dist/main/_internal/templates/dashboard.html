@@ -51,39 +51,73 @@
 </div>
 
 <div class="row g-3 mt-1 mb-3">
+
     <div class="col-6 col-lg-3">
-        <div class="stat-card">
+        <div class="stat-card" style="border-left-color:#16a34a;">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
-                    <div class="stat-label">Total Pengeluaran</div>
-                    <div class="stat-value" style="font-size:1.05rem;">{{ rp(total_pengeluaran) }}</div>
+                    <div class="stat-label">Kas Masuk</div>
+                    <div class="stat-value text-success" style="font-size:1.05rem;">
+                        {{ rp(total_kas_masuk) }}
+                    </div>
                 </div>
-                <div class="stat-icon"><i class="bi bi-wallet2"></i></div>
+                <div class="stat-icon text-success">
+                    <i class="bi bi-arrow-down-circle-fill"></i>
+                </div>
             </div>
         </div>
     </div>
+
     <div class="col-6 col-lg-3">
-        <div class="stat-card" style="border-left-color: {{ 'green' if laba_rugi >= 0 else 'red' }};">
+        <div class="stat-card" style="border-left-color:#dc2626;">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Kas Keluar</div>
+                    <div class="stat-value text-danger" style="font-size:1.05rem;">
+                        {{ rp(total_kas_keluar) }}
+                    </div>
+                </div>
+                <div class="stat-icon text-danger">
+                    <i class="bi bi-arrow-up-circle-fill"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="stat-card"
+             style="border-left-color: {{ '#16a34a' if laba_rugi >= 0 else '#dc2626' }};">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <div class="stat-label">Laba / Rugi</div>
-                    <div class="stat-value" style="font-size:1.05rem; color: {{ '#047857' if laba_rugi >= 0 else '#dc2626' }};">{{ rp(laba_rugi) }}</div>
+                    <div class="stat-value"
+                         style="font-size:1.05rem;color:{{ '#16a34a' if laba_rugi >= 0 else '#dc2626' }};">
+                        {{ rp(laba_rugi) }}
+                    </div>
                 </div>
-                <div class="stat-icon"><i class="bi bi-graph-up-arrow"></i></div>
+                <div class="stat-icon">
+                    <i class="bi bi-graph-up-arrow"></i>
+                </div>
             </div>
         </div>
     </div>
+
     <div class="col-6 col-lg-3">
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
-                    <div class="stat-label">Saldo Kas Saat Ini</div>
-                    <div class="stat-value" style="font-size:1.05rem;">{{ rp(saldo_kas) }}</div>
+                    <div class="stat-label">Saldo Kas</div>
+                    <div class="stat-value" style="font-size:1.05rem;">
+                        {{ rp(saldo_kas) }}
+                    </div>
                 </div>
-                <div class="stat-icon"><i class="bi bi-bank"></i></div>
+                <div class="stat-icon">
+                    <i class="bi bi-bank"></i>
+                </div>
             </div>
         </div>
     </div>
+
 </div>
 
 <div class="row g-3">
