@@ -212,118 +212,212 @@ def index():
 def dashboard():
     conn = get_db_connection()
 
-    total_ready = conn.execute(
-        "SELECT COUNT(*) c FROM laptop WHERE status = 'Ready'"
-    ).fetchone()["c"]
-    total_terjual = conn.execute(
-        "SELECT COUNT(*) c FROM laptop WHERE status = 'Terjual'"
-    ).fetchone()["c"]
-    modal_lapotop = conn.execute(
-        "SELECT COALESCE(SUM(total_modal),0) t FROM laptop"
-    ).fetchone()["t"]
-    total_penjualan = conn.execute(
-        "SELECT COALESCE(SUM(harga_jual),0) t FROM penjualan"
-    ).fetchone()["t"]
-    total_kas_masuk = conn.execute(
-        """
-        SELECT COALESCE(SUM(nominal),0) t
+    # =========================
+    # DATA LAPTOP
+    # =========================
+
+    total_ready = conn.execute("""
+        SELECT COUNT(*) c 
+        FROM laptop 
+        WHERE status='Ready'
+    """).fetchone()["c"]
+
+
+    total_terjual = conn.execute("""
+        SELECT COUNT(*) c 
+        FROM laptop 
+        WHERE status='Terjual'
+    """).fetchone()["c"]
+
+
+    # Nilai modal semua stok ready
+    nilai_stok = conn.execute("""
+        SELECT COALESCE(SUM(total_modal),0) total
+        FROM laptop
+        WHERE status='Ready'
+    """).fetchone()["total"]
+
+
+
+    # =========================
+    # PENJUALAN
+    # =========================
+
+    total_penjualan = conn.execute("""
+        SELECT COALESCE(SUM(harga_jual),0) total
+        FROM penjualan
+    """).fetchone()["total"]
+
+
+    # laba kotor dari transaksi
+    laba_kotor = conn.execute("""
+        SELECT COALESCE(SUM(laba),0) total
+        FROM penjualan
+    """).fetchone()["total"]
+
+
+
+    # =========================
+    # BIAYA OPERASIONAL
+    # =========================
+
+    biaya_operasional = conn.execute("""
+        SELECT COALESCE(SUM(nominal),0) total
+        FROM pengeluaran
+        WHERE tipe='keluar'
+    """).fetchone()["total"]
+
+
+
+    # laba bersih
+    laba_bersih = laba_kotor - biaya_operasional
+
+
+
+    # margin
+    margin_laba = 0
+
+    if total_penjualan > 0:
+        margin_laba = (laba_bersih / total_penjualan) * 100
+
+
+
+    # =========================
+    # CASHFLOW
+    # =========================
+
+    saldo_awal = conn.execute("""
+        SELECT COALESCE(SUM(nominal),0) total
+        FROM cashflow
+        WHERE ref_type='saldo_awal_kas'
+    """).fetchone()["total"]
+
+
+
+    total_kas_masuk = conn.execute("""
+        SELECT COALESCE(SUM(nominal),0) total
         FROM cashflow
         WHERE tipe='masuk'
         AND IFNULL(ref_type,'') <> 'saldo_awal_kas'
-        """
-    ).fetchone()["t"]
-
-    saldo_awal_Periode = conn.execute("""
-    SELECT COALESCE(SUM(nominal),0) AS total
-    FROM cashflow
-    WHERE ref_type='saldo_awal_kas'
     """).fetchone()["total"]
 
-    total_bersih = conn.execute("""
-    SELECT COALESCE(SUM(laba),0)
-    FROM penjualan
-    """).fetchone()[0]
 
-    total_kas_keluar = conn.execute(
-        """
-        SELECT COALESCE(SUM(nominal),0) t
+
+    total_kas_keluar = conn.execute("""
+        SELECT COALESCE(SUM(nominal),0) total
         FROM cashflow
         WHERE tipe='keluar'
-        """
-    ).fetchone()["t"]
+    """).fetchone()["total"]
 
-    laba_rugi = total_penjualan + total_kas_masuk - modal_lapotop - total_kas_keluar
 
-    masuk = conn.execute(
-        "SELECT COALESCE(SUM(nominal),0) t FROM pengeluaran WHERE tipe='masuk'"
-    ).fetchone()["t"]
-    keluar = conn.execute(
-        "SELECT COALESCE(SUM(nominal),0) t FROM cashflow WHERE tipe='keluar'"
-    ).fetchone()["t"]
-    saldo_kas = saldo_awal_Periode + total_kas_masuk - total_kas_keluar
-    total_modal = saldo_awal_Periode + total_bersih + masuk
-    # Data grafik: 6 bulan terakhir
+
+    saldo_kas = saldo_awal + total_kas_masuk - total_kas_keluar
+
+
+
+    # Modal berjalan = nilai barang + uang usaha
+    total_modal = nilai_stok + saldo_kas
+
+
+
+    # =========================
+    # GRAFIK 6 BULAN
+    # =========================
+
     bulan_labels = []
     penjualan_per_bulan = []
     pengeluaran_per_bulan = []
     cashflow_masuk_per_bulan = []
     cashflow_keluar_per_bulan = []
 
+
     today = datetime.now().date()
+
     for i in range(5, -1, -1):
-        ref = (today.replace(day=1) - timedelta(days=1)) if i == 0 else today
-        # Hitung bulan mundur secara sederhana
+
         year = today.year
         month = today.month - i
+
         while month <= 0:
             month += 12
             year -= 1
+
+
         label = f"{month:02d}-{year}"
         ym = f"{year}-{month:02d}"
+
         bulan_labels.append(label)
 
-        pj = conn.execute(
-            "SELECT COALESCE(SUM(harga_jual),0) t FROM penjualan WHERE strftime('%Y-%m', tanggal) = ?",
-            (ym,),
-        ).fetchone()["t"]
-        penjualan_per_bulan.append(pj)
 
-        pg = conn.execute(
-            "SELECT COALESCE(SUM(nominal),0) t FROM pengeluaran WHERE strftime('%Y-%m', tanggal) = ?",
-            (ym,),
-        ).fetchone()["t"]
-        pengeluaran_per_bulan.append(pg)
+        penjualan_per_bulan.append(
+            conn.execute("""
+                SELECT COALESCE(SUM(harga_jual),0)
+                FROM penjualan
+                WHERE strftime('%Y-%m',tanggal)=?
+            """,(ym,)).fetchone()[0]
+        )
 
-        cm = conn.execute(
-            "SELECT COALESCE(SUM(nominal),0) t FROM cashflow WHERE tipe='masuk' AND strftime('%Y-%m', tanggal) = ?",
-            (ym,),
-        ).fetchone()["t"]
-        ck = conn.execute(
-            "SELECT COALESCE(SUM(nominal),0) t FROM cashflow WHERE tipe='keluar' AND strftime('%Y-%m', tanggal) = ?",
-            (ym,),
-        ).fetchone()["t"]
-        cashflow_masuk_per_bulan.append(cm)
-        cashflow_keluar_per_bulan.append(ck)
+
+        pengeluaran_per_bulan.append(
+            conn.execute("""
+                SELECT COALESCE(SUM(nominal),0)
+                FROM pengeluaran
+                WHERE strftime('%Y-%m',tanggal)=?
+            """,(ym,)).fetchone()[0]
+        )
+
+
+        cashflow_masuk_per_bulan.append(
+            conn.execute("""
+                SELECT COALESCE(SUM(nominal),0)
+                FROM cashflow
+                WHERE tipe='masuk'
+                AND strftime('%Y-%m',tanggal)=?
+            """,(ym,)).fetchone()[0]
+        )
+
+
+        cashflow_keluar_per_bulan.append(
+            conn.execute("""
+                SELECT COALESCE(SUM(nominal),0)
+                FROM cashflow
+                WHERE tipe='keluar'
+                AND strftime('%Y-%m',tanggal)=?
+            """,(ym,)).fetchone()[0]
+        )
+
 
     conn.close()
 
+
     return render_template(
         "dashboard.html",
+
         total_ready=total_ready,
         total_terjual=total_terjual,
+
+        nilai_stok=nilai_stok,
         total_modal=total_modal,
+
         total_penjualan=total_penjualan,
+
+        laba_kotor=laba_kotor,
+        laba_bersih=laba_bersih,
+        laba_rugi=laba_bersih,
+
+        biaya_operasional=biaya_operasional,
+        margin_laba=margin_laba,
+
         total_kas_masuk=total_kas_masuk,
         total_kas_keluar=total_kas_keluar,
-        laba_rugi=laba_rugi,
         saldo_kas=saldo_kas,
+
         bulan_labels=bulan_labels,
         penjualan_per_bulan=penjualan_per_bulan,
         pengeluaran_per_bulan=pengeluaran_per_bulan,
         cashflow_masuk_per_bulan=cashflow_masuk_per_bulan,
         cashflow_keluar_per_bulan=cashflow_keluar_per_bulan,
     )
-
 
 # ---------------------------------------------------------------------------
 # PEMBELIAN LAPTOP (juga otomatis membuat Master Laptop)
