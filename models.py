@@ -97,6 +97,7 @@ def init_db():
             kategori TEXT,
             keterangan TEXT,
             nominal REAL DEFAULT 0,
+            tipe TEXT NOT NULL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
 

@@ -12,6 +12,30 @@
             --biru-utama: {{ app_settings.color_primary }};
             --biru-sidebar: {{ app_settings.color_sidebar }};
         }
+        /* Animated save popup */
+        .save-popup {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: var(--biru-utama);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+            transform: scale(0.6);
+            opacity: 0;
+            transition: transform 320ms cubic-bezier(.2,.9,.3,1), opacity 320ms;
+            z-index: 1200;
+        }
+        .save-popup.show {
+            transform: scale(1);
+            opacity: 1;
+        }
+        .save-popup .bi { font-size: 28px; }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
@@ -117,5 +141,25 @@
     <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% block scripts %}{% endblock %}
+    <script>
+    // show animated check popup on any success flash
+    (function(){
+        document.addEventListener('DOMContentLoaded', function(){
+            try{
+                var successAlert = document.querySelector('.alert-success');
+                if(successAlert){
+                    var popup = document.createElement('div');
+                    popup.className = 'save-popup';
+                    popup.innerHTML = '<i class="bi bi-check-lg"></i>';
+                    document.body.appendChild(popup);
+                    // trigger show
+                    setTimeout(function(){ popup.classList.add('show'); }, 20);
+                    // auto hide after 1.6s
+                    setTimeout(function(){ popup.classList.remove('show'); setTimeout(function(){ popup.remove(); }, 300); }, 1600);
+                }
+            }catch(e){ console.error(e); }
+        });
+    })();
+    </script>
 </body>
 </html>

@@ -1,22 +1,26 @@
-<form class="row g-2 align-items-end no-print" method="GET">
+<form class="row g-2 align-items-center no-print" method="GET">
     <div class="col-md-3">
-        <label class="form-label">Filter Periode</label>
-        <select name="filter" class="form-select" onchange="this.form.submit()">
-            <option value="semua" {% if filt=='semua' %}selected{% endif %}>Semua</option>
-            <option value="harian" {% if filt=='harian' %}selected{% endif %}>Harian</option>
-            <option value="bulanan" {% if filt=='bulanan' %}selected{% endif %}>Bulanan</option>
-            <option value="tahunan" {% if filt=='tahunan' %}selected{% endif %}>Tahunan</option>
-            <option value="periode" {% if filt=='periode' %}selected{% endif %}>Periode Kustom</option>
-        </select>
+        <!-- Menggunakan d-flex dan align-items-center agar checkbox & input sejajar tengah -->
+        <div class="d-flex align-items-center">
+            <input class="form-check-input me-2 mt-0" type="checkbox" name="use_start" value="1" id="useStart" {% if use_start %}checked{% endif %} onclick="this.form.querySelector('[name=start_date]').disabled = !this.checked}">
+            <input type="date" name="start_date" class="form-control" value="{{ start_date }}" {% if not use_start %}disabled{% endif %}>
+            <input type="hidden" name="use_start" value="0">
+        </div>
     </div>
+    
+    <!-- Teks s/d sekarang otomatis pas di tengah karena class 'align-items-center' di tag <form> -->
+    <div class="col-md-auto text-center fw-bold text-muted px-2">
+        s/d
+    </div>
+    
     <div class="col-md-3">
-        <label class="form-label">Dari Tanggal</label>
-        <input type="date" name="start_date" class="form-control" value="{{ start_date }}">
+        <div class="d-flex align-items-center">
+            <input class="form-check-input me-2 mt-0" type="checkbox" name="use_end" value="1" id="useEnd" {% if use_end %}checked{% endif %} onclick="this.form.querySelector('[name=end_date]').disabled = !this.checked}">
+            <input type="date" name="end_date" class="form-control" value="{{ end_date }}" {% if not use_end %}disabled{% endif %}>
+            <input type="hidden" name="use_end" value="0">
+        </div>
     </div>
-    <div class="col-md-3">
-        <label class="form-label">Sampai Tanggal</label>
-        <input type="date" name="end_date" class="form-control" value="{{ end_date }}">
-    </div>
+    
     <div class="col-md-3">
         <button class="btn btn-primary w-100"><i class="bi bi-funnel"></i> Terapkan</button>
     </div>

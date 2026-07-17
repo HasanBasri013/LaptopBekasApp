@@ -10,10 +10,6 @@ import os
 from datetime import datetime, timedelta
 from functools import wraps
 import tempfile
-from flask import jsonify
-# import threading
-# import webbrowser
-
 from flask import (
     Flask, render_template, request, redirect, url_for,
     session, flash, send_file, jsonify
@@ -33,11 +29,9 @@ from reportlab.platypus import Macro
 app = Flask(__name__)
 app.secret_key = "laptopbekasapp-secret-key-ubah-ini-di-produksi"
 
-
 # ---------------------------------------------------------------------------
 # Helper & Decorator
 # ---------------------------------------------------------------------------
-
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -49,10 +43,6 @@ def login_required(f):
 
 
 def page_required(page_key):
-    """
-    Membatasi akses halaman berdasarkan hak akses yang diatur oleh user root.
-    Root selalu memiliki akses penuh; user lain mengikuti pengaturan page_access.
-    """
     def wrapper(f):
         @wraps(f)
         def decorated(*args, **kwargs):
@@ -95,13 +85,12 @@ def to_float(value, default=0.0):
         return v if v >= 0 else default
     except (TypeError, ValueError):
         return default
-    
+
+
 def hitung_saldo_awal(start_date):
     if not start_date:
         return 0
-
     conn = get_db_connection()
-
     masuk = conn.execute(
         """
         SELECT COALESCE(SUM(nominal),0) t
@@ -111,7 +100,6 @@ def hitung_saldo_awal(start_date):
         """,
         (start_date,),
     ).fetchone()["t"]
-
     keluar = conn.execute(
         """
         SELECT COALESCE(SUM(nominal),0) t
@@ -121,33 +109,37 @@ def hitung_saldo_awal(start_date):
         """,
         (start_date,),
     ).fetchone()["t"]
-
     conn.close()
-
     return masuk - keluar
 
 
 def get_period_range():
-    """Menentukan rentang tanggal berdasarkan parameter query filter."""
-    filt = request.args.get("filter", "semua")
+    def _is_true(v):
+        return str(v).lower() in ("1", "true", "on", "yes")
     today = datetime.now().date()
-    start_date = request.args.get("start_date", "")
-    end_date = request.args.get("end_date", "")
-
-    if filt == "harian":
-        start_date = end_date = today.strftime("%Y-%m-%d")
-    elif filt == "bulanan":
-        start_date = today.replace(day=1).strftime("%Y-%m-%d")
-        end_date = today.strftime("%Y-%m-%d")
-    elif filt == "tahunan":
-        start_date = today.replace(month=1, day=1).strftime("%Y-%m-%d")
-        end_date = today.strftime("%Y-%m-%d")
-    elif filt == "periode":
-        pass  # gunakan start_date & end_date dari form
+    first_of_month = today.replace(day=1)
+    next_month = (first_of_month + timedelta(days=32)).replace(day=1)
+    last_of_month = next_month - timedelta(days=1)
+    has_period_args = any(k in request.args for k in ("use_start", "use_end", "start_date", "end_date"))
+    use_start = _is_true(request.args.get("use_start", ""))
+    use_end = _is_true(request.args.get("use_end", ""))
+    start_date = request.args.get("start_date", "").strip()
+    end_date = request.args.get("end_date", "").strip()
+    if not has_period_args:
+        use_start = True
+        use_end = True
+        start_date = first_of_month.strftime("%Y-%m-%d")
+        end_date = last_of_month.strftime("%Y-%m-%d")
     else:
-        start_date, end_date = "", ""
-
-    return filt, start_date, end_date
+        if use_start and not start_date:
+            start_date = first_of_month.strftime("%Y-%m-%d")
+        if use_end and not end_date:
+            end_date = last_of_month.strftime("%Y-%m-%d")
+        if not use_start:
+            start_date = ""
+        if not use_end:
+            end_date = ""
+    return use_start, use_end, start_date, end_date
 
 
 @app.context_processor
@@ -161,73 +153,167 @@ def inject_globals():
     }
 
 
-# ---------------------------------------------------------------------------
-# AUTH
-# ---------------------------------------------------------------------------
+@app.route("/")
+def index():
+    return redirect(url_for("dashboard"))
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if "user_id" in session:
-        return redirect(url_for("dashboard"))
-
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
+        f = request.form
+        username = (f.get("username") or "").strip()
+        password = f.get("password") or ""
         conn = get_db_connection()
-        user = conn.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
         conn.close()
-
-        if user and check_password_hash(user["password_hash"], password):
-            session["user_id"] = user["id"]
-            session["username"] = user["username"]
-            session["nama"] = user["nama"]
-            session["role"] = user["role"]
-            flash(f"Selamat datang, {user['nama'] or user['username']}!", "success")
-            return redirect(url_for("dashboard"))
-        flash("Username atau password salah.", "danger")
-
+        if not row:
+            flash("Username tidak ditemukan.", "danger")
+            return redirect(url_for("login"))
+        if not check_password_hash(row["password_hash"], password):
+            flash("Password salah.", "danger")
+            return redirect(url_for("login"))
+        session["user_id"] = row["id"]
+        session["username"] = row["username"]
+        role = None
+        try:
+            role = row["role"]
+        except Exception:
+            role = None
+        session["role"] = role or "admin"
+        flash("Login berhasil.", "success")
+        return redirect(url_for("dashboard"))
     return render_template("login.html")
 
 
 @app.route("/logout")
 def logout():
     session.clear()
-    flash("Anda telah logout.", "info")
+    flash("Anda telah logout.", "success")
     return redirect(url_for("login"))
 
-
-@app.route("/")
-def index():
-    return redirect(url_for("dashboard") if "user_id" in session else url_for("login"))
-
-
-# ---------------------------------------------------------------------------
-# DASHBOARD
-# ---------------------------------------------------------------------------
 
 @app.route("/dashboard")
 @page_required("dashboard")
 def dashboard():
+    use_start, use_end, start_date, end_date = get_period_range()
     conn = get_db_connection()
 
-    # =========================
-    # DATA LAPTOP
-    # =========================
+    total_ready = conn.execute("SELECT COUNT(*) c FROM laptop WHERE status='Ready'").fetchone()["c"]
 
-    total_ready = conn.execute("""
-        SELECT COUNT(*) c 
-        FROM laptop 
-        WHERE status='Ready'
-    """).fetchone()["c"]
+    q = "SELECT COUNT(*) c FROM penjualan WHERE 1=1"
+    params = []
+    if start_date:
+        q += " AND tanggal >= ?"; params.append(start_date)
+    if end_date:
+        q += " AND tanggal <= ?"; params.append(end_date)
+    total_terjual = conn.execute(q, params).fetchone()["c"]
 
+    nilai_stok = conn.execute("SELECT COALESCE(SUM(total_modal),0) total FROM laptop WHERE status='Ready'").fetchone()["total"]
 
-    total_terjual = conn.execute("""
-        SELECT COUNT(*) c 
-        FROM laptop 
-        WHERE status='Terjual'
-    """).fetchone()["c"]
+    q_in = "SELECT COALESCE(SUM(nominal),0) total FROM cashflow WHERE tipe='masuk' AND IFNULL(ref_type,'') <> 'saldo_awal_kas'"
+    q_out = "SELECT COALESCE(SUM(nominal),0) total FROM cashflow WHERE tipe='keluar'"
+    params_in = []
+    params_out = []
+    if start_date:
+        q_in += " AND tanggal >= ?"; params_in.append(start_date)
+        q_out += " AND tanggal >= ?"; params_out.append(start_date)
+    if end_date:
+        q_in += " AND tanggal <= ?"; params_in.append(end_date)
+        q_out += " AND tanggal <= ?"; params_out.append(end_date)
+    total_kas_masuk = conn.execute(q_in, params_in).fetchone()["total"]
+    total_kas_keluar = conn.execute(q_out, params_out).fetchone()["total"]
+
+    q = "SELECT COALESCE(SUM(harga_jual),0) total FROM penjualan WHERE 1=1"
+    qparams = []
+    if start_date:
+        q += " AND tanggal >= ?"; qparams.append(start_date)
+    if end_date:
+        q += " AND tanggal <= ?"; qparams.append(end_date)
+    total_penjualan = conn.execute(q, qparams).fetchone()["total"]
+
+    q = "SELECT COALESCE(SUM(laba),0) total FROM penjualan WHERE 1=1"
+    qparams = []
+    if start_date:
+        q += " AND tanggal >= ?"; qparams.append(start_date)
+    if end_date:
+        q += " AND tanggal <= ?"; qparams.append(end_date)
+    laba_kotor = conn.execute(q, qparams).fetchone()["total"]
+
+    q = "SELECT COALESCE(SUM(nominal),0) total FROM pengeluaran WHERE tipe='keluar'"
+    qparams = []
+    if start_date:
+        q += " AND tanggal >= ?"; qparams.append(start_date)
+    if end_date:
+        q += " AND tanggal <= ?"; qparams.append(end_date)
+    biaya_operasional = conn.execute(q, qparams).fetchone()["total"]
+
+    laba_bersih = laba_kotor - biaya_operasional
+    laba_rugi = laba_bersih
+    margin_laba = (laba_bersih / total_penjualan * 100) if total_penjualan > 0 else 0
+
+    saldo_awal = hitung_saldo_awal(start_date)
+    saldo_kas = saldo_awal + total_kas_masuk - total_kas_keluar
+    total_modal = nilai_stok + saldo_kas
+
+    bulan_labels = []
+    penjualan_per_bulan = []
+    pengeluaran_per_bulan = []
+    cashflow_masuk_per_bulan = []
+    cashflow_keluar_per_bulan = []
+    today = datetime.now().date()
+    for i in range(5, -1, -1):
+        y = today.year
+        m = today.month - i
+        while m <= 0:
+            m += 12; y -= 1
+        label = f"{m:02d}-{y}"
+        ym = f"{y}-{m:02d}"
+        bulan_labels.append(label)
+        penjualan_per_bulan.append(conn.execute("SELECT COALESCE(SUM(harga_jual),0) FROM penjualan WHERE strftime('%Y-%m',tanggal)=?", (ym,)).fetchone()[0])
+        pengeluaran_per_bulan.append(conn.execute("SELECT COALESCE(SUM(nominal),0) FROM pengeluaran WHERE strftime('%Y-%m',tanggal)=?", (ym,)).fetchone()[0])
+        cashflow_masuk_per_bulan.append(conn.execute("SELECT COALESCE(SUM(nominal),0) FROM cashflow WHERE tipe='masuk' AND strftime('%Y-%m',tanggal)=?", (ym,)).fetchone()[0])
+        cashflow_keluar_per_bulan.append(conn.execute("SELECT COALESCE(SUM(nominal),0) FROM cashflow WHERE tipe='keluar' AND strftime('%Y-%m',tanggal)=?", (ym,)).fetchone()[0])
+
+    conn.close()
+
+    return render_template("dashboard.html",
+        total_ready=total_ready,
+        total_terjual=total_terjual,
+        nilai_stok=nilai_stok,
+        total_modal=total_modal,
+        total_penjualan=total_penjualan,
+        laba_kotor=laba_kotor,
+        laba_bersih=laba_bersih,
+        laba_rugi=laba_rugi,
+        biaya_operasional=biaya_operasional,
+        margin_laba=margin_laba,
+        total_kas_masuk=total_kas_masuk,
+        total_kas_keluar=total_kas_keluar,
+        saldo_kas=saldo_kas,
+        bulan_labels=bulan_labels,
+        penjualan_per_bulan=penjualan_per_bulan,
+        pengeluaran_per_bulan=pengeluaran_per_bulan,
+        cashflow_masuk_per_bulan=cashflow_masuk_per_bulan,
+        cashflow_keluar_per_bulan=cashflow_keluar_per_bulan,
+        use_start=use_start,
+        use_end=use_end,
+        start_date=start_date,
+        end_date=end_date,
+        saldo_awal=saldo_awal,
+        saldo_akhir=saldo_kas,
+        total_masuk=total_kas_masuk,
+        total_keluar=total_kas_keluar,
+    )
+
+# ---------------------------------------------------------------------------
+    q_sold = "SELECT COUNT(*) c FROM penjualan WHERE 1=1"
+    params_sold = []
+    if start_date:
+        q_sold += " AND tanggal >= ?"; params_sold.append(start_date)
+    if end_date:
+        q_sold += " AND tanggal <= ?"; params_sold.append(end_date)
+    total_terjual = conn.execute(q_sold, params_sold).fetchone()["c"]
 
 
     # Nilai modal semua stok ready
@@ -237,35 +323,60 @@ def dashboard():
         WHERE status='Ready'
     """).fetchone()["total"]
 
+    # =========================
+    # CASHFLOW
+    # =========================
+
+    # saldo awal (tidak dibatasi periode)
+    saldo_awal = conn.execute("SELECT COALESCE(SUM(nominal),0) total FROM cashflow WHERE ref_type='saldo_awal_kas'").fetchone()["total"]
+
+    # kas masuk/keluar pada periode
+    q_in = "SELECT COALESCE(SUM(nominal),0) total FROM cashflow WHERE tipe='masuk' AND IFNULL(ref_type,'') <> 'saldo_awal_kas'"
+    q_out = "SELECT COALESCE(SUM(nominal),0) total FROM cashflow WHERE tipe='keluar'"
+    params_in = []
+    params_out = []
+    if start_date:
+        q_in += " AND tanggal >= ?"; params_in.append(start_date)
+        q_out += " AND tanggal >= ?"; params_out.append(start_date)
+    if end_date:
+        q_in += " AND tanggal <= ?"; params_in.append(end_date)
+        q_out += " AND tanggal <= ?"; params_out.append(end_date)
+    total_kas_masuk = conn.execute(q_in, params_in).fetchone()["total"]
+    total_kas_keluar = conn.execute(q_out, params_out).fetchone()["total"]
+
 
 
     # =========================
-    # PENJUALAN
+    # PENJUALAN (hanya pada periode yang dipilih)
     # =========================
+    q = "SELECT COALESCE(SUM(harga_jual),0) total FROM penjualan WHERE 1=1"
+    qparams = []
+    if start_date:
+        q += " AND tanggal >= ?"; qparams.append(start_date)
+    if end_date:
+        q += " AND tanggal <= ?"; qparams.append(end_date)
+    total_penjualan = conn.execute(q, qparams).fetchone()["total"]
 
-    total_penjualan = conn.execute("""
-        SELECT COALESCE(SUM(harga_jual),0) total
-        FROM penjualan
-    """).fetchone()["total"]
-
-
-    # laba kotor dari transaksi
-    laba_kotor = conn.execute("""
-        SELECT COALESCE(SUM(laba),0) total
-        FROM penjualan
-    """).fetchone()["total"]
-
+    # laba kotor dari transaksi pada periode
+    q = "SELECT COALESCE(SUM(laba),0) total FROM penjualan WHERE 1=1"
+    qparams = []
+    if start_date:
+        q += " AND tanggal >= ?"; qparams.append(start_date)
+    if end_date:
+        q += " AND tanggal <= ?"; qparams.append(end_date)
+    laba_kotor = conn.execute(q, qparams).fetchone()["total"]
 
 
     # =========================
-    # BIAYA OPERASIONAL
+    # BIAYA OPERASIONAL (periode)
     # =========================
-
-    biaya_operasional = conn.execute("""
-        SELECT COALESCE(SUM(nominal),0) total
-        FROM pengeluaran
-        WHERE tipe='keluar'
-    """).fetchone()["total"]
+    q = "SELECT COALESCE(SUM(nominal),0) total FROM pengeluaran WHERE tipe='keluar'"
+    qparams = []
+    if start_date:
+        q += " AND tanggal >= ?"; qparams.append(start_date)
+    if end_date:
+        q += " AND tanggal <= ?"; qparams.append(end_date)
+    biaya_operasional = conn.execute(q, qparams).fetchone()["total"]
 
 
 
@@ -417,6 +528,10 @@ def dashboard():
         pengeluaran_per_bulan=pengeluaran_per_bulan,
         cashflow_masuk_per_bulan=cashflow_masuk_per_bulan,
         cashflow_keluar_per_bulan=cashflow_keluar_per_bulan,
+        use_start=use_start,
+        use_end=use_end,
+        start_date=start_date,
+        end_date=end_date,
     )
 
 # ---------------------------------------------------------------------------
@@ -427,22 +542,24 @@ def dashboard():
 @page_required("pembelian")
 def pembelian_list():
     q = request.args.get("q", "").strip()
+    use_start, use_end, start_date, end_date = get_period_range()
     conn = get_db_connection()
+    base = "SELECT * FROM laptop WHERE 1=1"
+    params = []
     if q:
         like = f"%{q}%"
-        rows = conn.execute(
-            """SELECT * FROM laptop WHERE
-               merk LIKE ? OR seri LIKE ? OR processor LIKE ? OR ram LIKE ? OR
-               storage LIKE ? OR imei LIKE ? OR supplier LIKE ? OR nomor_pembelian LIKE ?
-               ORDER BY id DESC""",
-            (like, like, like, like, like, like, like, like),
-        ).fetchall()
-    else:
-        rows = conn.execute("SELECT * FROM laptop ORDER BY id DESC").fetchall()
+        base += " AND (merk LIKE ? OR seri LIKE ? OR processor LIKE ? OR ram LIKE ? OR storage LIKE ? OR imei LIKE ? OR supplier LIKE ? OR nomor_pembelian LIKE ?)"
+        params.extend([like] * 8)
+    if start_date:
+        base += " AND tanggal >= ?"
+        params.append(start_date)
+    if end_date:
+        base += " AND tanggal <= ?"
+        params.append(end_date)
+    base += " ORDER BY tanggal DESC"
+    rows = conn.execute(base, params).fetchall()
     conn.close()
-    return render_template("pembelian_list.html", rows=rows, q=q)
-
-
+    return render_template("pembelian_list.html", rows=rows, q=q, use_start=use_start, use_end=use_end, start_date=start_date, end_date=end_date)
 @app.route("/pembelian/tambah", methods=["GET", "POST"])
 @page_required("pembelian")
 def pembelian_tambah():
@@ -592,19 +709,25 @@ def stok_list():
 @page_required("penjualan")
 def penjualan_list():
     q = request.args.get("q", "").strip()
+    use_start, use_end, start_date, end_date = get_period_range()
     conn = get_db_connection()
     base = """SELECT p.*, l.merk, l.seri, l.total_modal, l.nomor_pembelian
-              FROM penjualan p JOIN laptop l ON p.laptop_id = l.id"""
+              FROM penjualan p JOIN laptop l ON p.laptop_id = l.id WHERE 1=1"""
     params = []
     if q:
         like = f"%{q}%"
-        base += """ WHERE p.pembeli LIKE ? OR l.merk LIKE ? OR l.seri LIKE ?
-                    OR p.nomor_penjualan LIKE ?"""
-        params = [like, like, like, like]
-    base += " ORDER BY p.id DESC"
+        base += " AND (p.pembeli LIKE ? OR l.merk LIKE ? OR l.seri LIKE ? OR p.nomor_penjualan LIKE ? OR l.nomor_pembelian LIKE ? OR l.imei LIKE ?)"
+        params.extend([like, like, like, like, like, like])
+    if start_date:
+        base += " AND p.tanggal >= ?"
+        params.append(start_date)
+    if end_date:
+        base += " AND p.tanggal <= ?"
+        params.append(end_date)
+    base += " ORDER BY p.tanggal DESC"
     rows = conn.execute(base, params).fetchall()
     conn.close()
-    return render_template("penjualan_list.html", rows=rows, q=q)
+    return render_template("penjualan_list.html", rows=rows, q=q, use_start=use_start, use_end=use_end, start_date=start_date, end_date=end_date)
 
 
 @app.route("/penjualan/tambah", methods=["GET", "POST"])
@@ -738,18 +861,24 @@ KATEGORI_PENGELUARAN = [
 @page_required("pengeluaran")
 def pengeluaran_list():
     q = request.args.get("q", "").strip()
+    use_start, use_end, start_date, end_date = get_period_range()
     conn = get_db_connection()
+    base = "SELECT * FROM pengeluaran WHERE 1=1"
+    params = []
     if q:
         like = f"%{q}%"
-        rows = conn.execute(
-            """SELECT * FROM pengeluaran WHERE kategori LIKE ? OR keterangan LIKE ?
-               OR nomor LIKE ? ORDER BY id DESC""",
-            (like, like, like),
-        ).fetchall()
-    else:
-        rows = conn.execute("SELECT * FROM pengeluaran ORDER BY id DESC").fetchall()
+        base += " AND (kategori LIKE ? OR keterangan LIKE ? OR nomor LIKE ?)"
+        params.extend([like, like, like])
+    if start_date:
+        base += " AND tanggal >= ?"
+        params.append(start_date)
+    if end_date:
+        base += " AND tanggal <= ?"
+        params.append(end_date)
+    base += " ORDER BY tanggal DESC"
+    rows = conn.execute(base, params).fetchall()
     conn.close()
-    return render_template("pengeluaran_list.html", rows=rows, q=q, kategori_list=KATEGORI_PENGELUARAN)
+    return render_template("pengeluaran_list.html", rows=rows, q=q, kategori_list=KATEGORI_PENGELUARAN, use_start=use_start, use_end=use_end, start_date=start_date, end_date=end_date)
 
 
 @app.route("/pengeluaran/tambah", methods=["GET", "POST"])
@@ -874,17 +1003,15 @@ def pengeluaran_hapus(id):
 @app.route("/cashflow")
 @page_required("cashflow")
 def cashflow_view():
-    filt, start_date, end_date = get_period_range()
+    use_start, use_end, start_date, end_date = get_period_range()
     conn = get_db_connection()
 
     query = "SELECT * FROM cashflow WHERE 1=1"
     params = []
     if start_date:
-        query += " AND tanggal >= ?"
-        params.append(start_date)
+        query += " AND tanggal >= ?"; params.append(start_date)
     if end_date:
-        query += " AND tanggal <= ?"
-        params.append(end_date)
+        query += " AND tanggal <= ?"; params.append(end_date)
     query += " ORDER BY tanggal ASC, id ASC"
     rows = conn.execute(query, params).fetchall()
 
@@ -899,7 +1026,6 @@ def cashflow_view():
             (start_date,),
         ).fetchone()["t"]
         saldo_awal = masuk_awal - keluar_awal
-    conn.close()
 
     saldo = saldo_awal
     data = []
@@ -917,9 +1043,11 @@ def cashflow_view():
             "nominal": r["nominal"], "saldo": saldo,
         })
 
-    return render_template("cashflow.html", data=data, filt=filt, start_date=start_date,
-                            end_date=end_date, saldo_awal=saldo_awal, saldo_akhir=saldo,
-                            total_masuk=total_masuk, total_keluar=total_keluar)
+    conn.close()
+
+    return render_template("cashflow.html", data=data, use_start=use_start, use_end=use_end, start_date=start_date,
+                            end_date=end_date, saldo_awal=saldo_awal, saldo_akhir=saldo, total_masuk=total_masuk,
+                            total_keluar=total_keluar)
 
 
 @app.route("/cashflow/tambah", methods=["GET", "POST"])
@@ -1075,7 +1203,7 @@ def laporan_menu():
 
 
 def _laporan_pembelian_data():
-    filt, start_date, end_date = get_period_range()
+    use_start, use_end, start_date, end_date = get_period_range()
     conn = get_db_connection()
     query = "SELECT * FROM laptop WHERE 1=1"
     params = []
@@ -1089,21 +1217,21 @@ def _laporan_pembelian_data():
     rows = conn.execute(query, params).fetchall()
     conn.close()
     total = sum(r["total_modal"] for r in rows)
-    return rows, total, filt, start_date, end_date
+    return rows, total, use_start, use_end, start_date, end_date
 
 
 @app.route("/laporan/pembelian")
 @page_required("laporan")
 def laporan_pembelian():
-    rows, total, filt, start_date, end_date = _laporan_pembelian_data()
-    return render_template("laporan_pembelian.html", rows=rows, total=total, filt=filt,
+    rows, total, use_start, use_end, start_date, end_date = _laporan_pembelian_data()
+    return render_template("laporan_pembelian.html", rows=rows, total=total, use_start=use_start, use_end=use_end,
                             start_date=start_date, end_date=end_date)
 
 
 @app.route("/laporan/pembelian/pdf")
 @page_required("laporan")
 def laporan_pembelian_pdf():
-    rows, total, filt, start_date, end_date = _laporan_pembelian_data()
+    rows, total, use_start, use_end, start_date, end_date = _laporan_pembelian_data()
     headers = ["No. Pembelian", "Tanggal", "Merk/Seri", "Supplier", "Status", "Total Modal"]
     data = [[r["nomor_pembelian"], r["tanggal"], f'{r["merk"]} {r["seri"]}',
              r["supplier"] or "-", r["status"], reports.rp(r["total_modal"])] for r in rows]
@@ -1116,7 +1244,7 @@ def laporan_pembelian_pdf():
 @app.route("/laporan/pembelian/excel")
 @page_required("laporan")
 def laporan_pembelian_excel():
-    rows, total, filt, start_date, end_date = _laporan_pembelian_data()
+    rows, total, use_start, use_end, start_date, end_date = _laporan_pembelian_data()
     headers = ["No. Pembelian", "Tanggal", "Merk", "Seri", "Supplier", "Status", "Total Modal"]
     data = [[r["nomor_pembelian"], r["tanggal"], r["merk"], r["seri"],
              r["supplier"] or "-", r["status"], r["total_modal"]] for r in rows]
@@ -1127,7 +1255,7 @@ def laporan_pembelian_excel():
 
 
 def _laporan_penjualan_data():
-    filt, start_date, end_date = get_period_range()
+    use_start, use_end, start_date, end_date = get_period_range()
     conn = get_db_connection()
     query = """SELECT p.*, l.merk, l.seri, l.total_modal FROM penjualan p
                JOIN laptop l ON p.laptop_id = l.id WHERE 1=1"""
@@ -1144,22 +1272,22 @@ def _laporan_penjualan_data():
     total_modal = sum(r["total_modal"] for r in rows)
     total_jual = sum(r["harga_jual"] for r in rows)
     total_laba = sum(r["laba"] for r in rows)
-    return rows, total_modal, total_jual, total_laba, filt, start_date, end_date
+    return rows, total_modal, total_jual, total_laba, use_start, use_end, start_date, end_date
 
 
 @app.route("/laporan/penjualan")
 @page_required("laporan")
 def laporan_penjualan():
-    rows, total_modal, total_jual, total_laba, filt, start_date, end_date = _laporan_penjualan_data()
+    rows, total_modal, total_jual, total_laba, use_start, use_end, start_date, end_date = _laporan_penjualan_data()
     return render_template("laporan_penjualan.html", rows=rows, total_modal=total_modal,
-                            total_jual=total_jual, total_laba=total_laba, filt=filt,
+                            total_jual=total_jual, total_laba=total_laba, use_start=use_start, use_end=use_end,
                             start_date=start_date, end_date=end_date)
 
 
 @app.route("/laporan/penjualan/pdf")
 @page_required("laporan")
 def laporan_penjualan_pdf():
-    rows, total_modal, total_jual, total_laba, filt, start_date, end_date = _laporan_penjualan_data()
+    rows, total_modal, total_jual, total_laba, use_start, use_end, start_date, end_date = _laporan_penjualan_data()
     headers = ["No. Penjualan", "Tanggal", "Laptop", "Pembeli", "Modal", "Harga Jual", "Laba"]
     data = [[r["nomor_penjualan"], r["tanggal"], f'{r["merk"]} {r["seri"]}', r["pembeli"] or "-",
              reports.rp(r["total_modal"]), reports.rp(r["harga_jual"]), reports.rp(r["laba"])]
@@ -1316,7 +1444,7 @@ def laporan_stok_terjual_excel():
 
 
 def _laporan_pengeluaran_data():
-    filt, start_date, end_date = get_period_range()
+    use_start, use_end, start_date, end_date = get_period_range()
     conn = get_db_connection()
     query = "SELECT * FROM pengeluaran WHERE 1=1"
     params = []
@@ -1330,21 +1458,21 @@ def _laporan_pengeluaran_data():
     rows = conn.execute(query, params).fetchall()
     conn.close()
     total = sum(r["nominal"] for r in rows)
-    return rows, total, filt, start_date, end_date
+    return rows, total, use_start, use_end, start_date, end_date
 
 
 @app.route("/laporan/pengeluaran")
 @page_required("laporan")
 def laporan_pengeluaran():
-    rows, total, filt, start_date, end_date = _laporan_pengeluaran_data()
-    return render_template("laporan_pengeluaran.html", rows=rows, total=total, filt=filt,
+    rows, total, use_start, use_end, start_date, end_date = _laporan_pengeluaran_data()
+    return render_template("laporan_pengeluaran.html", rows=rows, total=total, use_start=use_start, use_end=use_end,
                             start_date=start_date, end_date=end_date)
 
 
 @app.route("/laporan/pengeluaran/pdf")
 @page_required("laporan")
 def laporan_pengeluaran_pdf():
-    rows, total, filt, start_date, end_date = _laporan_pengeluaran_data()
+    rows, total, use_start, use_end, start_date, end_date = _laporan_pengeluaran_data()
     headers = ["Nomor", "Tanggal", "Kategori", "Keterangan", "Nominal"]
     data = [[r["nomor"], r["tanggal"], r["kategori"], r["keterangan"] or "-",
              reports.rp(r["nominal"])] for r in rows]
@@ -1375,7 +1503,7 @@ def laporan_cashflow():
 @app.route("/laporan/cashflow/pdf")
 @page_required("laporan")
 def laporan_cashflow_pdf():
-    filt, start_date, end_date = get_period_range()
+    use_start, use_end, start_date, end_date = get_period_range()
     conn = get_db_connection()
     query = "SELECT * FROM cashflow WHERE 1=1"
     params = []
@@ -1406,7 +1534,7 @@ def laporan_cashflow_pdf():
 @app.route("/laporan/cashflow/excel")
 @page_required("laporan")
 def laporan_cashflow_excel():
-    filt, start_date, end_date = get_period_range()
+    use_start, use_end, start_date, end_date = get_period_range()
     conn = get_db_connection()
     query = "SELECT * FROM cashflow WHERE 1=1"
     params = []
@@ -1434,7 +1562,7 @@ def laporan_cashflow_excel():
 
 
 def _laba_rugi_data():
-    filt, start_date, end_date = get_period_range()
+    use_start, use_end, start_date, end_date = get_period_range()
     conn = get_db_connection()
 
     q_jual = "SELECT COALESCE(SUM(harga_jual),0) t FROM penjualan WHERE 1=1"
@@ -1457,15 +1585,15 @@ def _laba_rugi_data():
     conn.close()
 
     laba_bersih = pendapatan - modal - beban
-    return pendapatan, modal, beban, laba_bersih, filt, start_date, end_date
+    return pendapatan, modal, beban, laba_bersih, use_start, use_end, start_date, end_date
 
 
 @app.route("/laporan/laba-rugi")
 @page_required("laporan")
 def laporan_laba_rugi():
-    pendapatan, modal, beban, laba_bersih, filt, start_date, end_date = _laba_rugi_data()
+    pendapatan, modal, beban, laba_bersih, use_start, use_end, start_date, end_date = _laba_rugi_data()
     return render_template("laporan_labarugi.html", pendapatan=pendapatan, modal=modal,
-                            beban=beban, laba_bersih=laba_bersih, filt=filt,
+                            beban=beban, laba_bersih=laba_bersih, use_start=use_start, use_end=use_end,
                             start_date=start_date, end_date=end_date)
 
 

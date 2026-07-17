@@ -29,6 +29,7 @@
 
             <div class="col-md-6">
                 <label class="form-label">Pilih Laptop (Stok Ready) <span class="text-danger">*</span></label>
+                <input type="text" id="laptop_search" class="form-control mb-2" placeholder="Cari nomor PO, merk, seri, IMEI...">
                 <select name="laptop_id" id="laptop_id" class="form-select" {% if row %}disabled{% endif %} required onchange="isiModal()">
                     {% if not row %}<option value="">-- Pilih Laptop --</option>{% endif %}
                     {% for l in laptop_ready %}
@@ -84,5 +85,19 @@ function isiModal() {
     const modal = opt ? (opt.getAttribute('data-modal') || 0) : 0;
     document.getElementById('modal_display').value = 'Rp ' + Number(modal).toLocaleString('id-ID');
 }
+// simple filter for laptop select
+document.addEventListener('DOMContentLoaded', function(){
+    var input = document.getElementById('laptop_search');
+    var sel = document.getElementById('laptop_id');
+    if(!input || !sel) return;
+    input.addEventListener('input', function(){
+        var q = this.value.toLowerCase().trim();
+        for(var i=0;i<sel.options.length;i++){
+            var opt = sel.options[i];
+            var txt = (opt.text || '').toLowerCase();
+            opt.style.display = (q === '' || txt.indexOf(q) !== -1) ? '' : 'none';
+        }
+    });
+});
 </script>
 {% endblock %}
